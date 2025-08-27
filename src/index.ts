@@ -1,23 +1,33 @@
-import { Response, Request } from "express";
 import express from "express";
 import dotenv from "dotenv";
-import cors from "cors";
-import helmet from "helmet";
-import authRoutes from "./routes/auth.routes";
-import path from "path";
+import db from "./config/database";
+import authRouter from "./routes/auth.routes";
+import prisma from "./utils/prisma";
 
 dotenv.config();
+const server = express();
+const port = process.env.PORT;
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-app.use(express.static(path.join(__dirname, "public")));
+// Checking database connection
+db.connect()
+  .then(() => {
+    console.log("✅ Database connected successfully");
+  })
+  .catch((err) => {
+    console.error("❌ Database connection failed:", err.message);
+    process.exit(1);
+  });
 
-app.use(express.json());
-app.use(cors());
-app.use(helmet());
+server.use(express.json());
 
-app.use("/", authRoutes);
+server.use("/api", authRouter);
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+server.get("/", async (req, res) => {
+  const users = await prisma.user.findMany();
+  res.send(users);
+});
+
+// Running server on desire port
+server.listen(port, () => {
+  console.log(`Running on http://localhost:${port}/`);
 });
