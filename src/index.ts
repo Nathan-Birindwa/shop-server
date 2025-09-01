@@ -1,9 +1,17 @@
 import express, { Request, Response } from "express";
 import dotenv from "dotenv";
 import authRouter from "./routes/auth.routes";
-import prisma from "./utils/prisma";
+import db from "./config/database";
 
 dotenv.config();
+
+// Database connection checking
+
+db.connect()
+  .then(() => console.log("Database connection was established ✅"))
+  .catch((err) =>
+    console.log("Database connection failed to establish ❌ due to", err)
+  );
 
 const server = express();
 const port = process.env.PORT || 3000;
@@ -12,14 +20,10 @@ server.use(express.json());
 
 server.use("/api", authRouter);
 
-server.get("/", async (req: Request, res: Response) => {
-  try {
-    const users = await prisma.user.findMany();
-    res.json(users);
-  } catch (error) {
-    console.error("Error fetching users:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
+server.get("/", async (req, res) => {
+  const response = await db.query("SELECT * FROM users");
+  console.log(response.rows);
+  res.send("Hello World");
 });
 
 server.listen(port, () => {
