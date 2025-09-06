@@ -1,14 +1,14 @@
 import bcrypt from "bcrypt";
 import db from "../config/database";
+import jwt from "jsonwebtoken";
 
-const saltRounds = 16;
+const saltRounds = 10;
 
 interface User {
   id: number;
   fullName: string;
   email: string;
   createdAt: Date;
-  // Don't include password in return type for security
 }
 
 interface UserCreationResult {
@@ -28,12 +28,11 @@ export default async function userCreation(
       throw new Error("All fields are required");
     }
 
-    // ✅ Use PostgreSQL syntax consistently
+    // Ensure email is unique
     const result = await db.query("SELECT id FROM users WHERE email = $1", [
-      email,
+      email.toLowerCase(),
     ]);
 
-    // ✅ Correct way to access PostgreSQL results
     if (result.rows.length > 0) {
       throw new Error("There is an account associated with this email");
     }
@@ -41,15 +40,14 @@ export default async function userCreation(
     // Hash password
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // ✅ Create new user with RETURNING clause
+    // Insert user
     const new_user = await db.query(
       `INSERT INTO users (fullName, email, password) 
        VALUES ($1, $2, $3) 
-       RETURNING id, fullName, email`,
-      [fullName, email, hashedPassword]
+       RETURNING id, fullName, email, createdAt`,
+      [fullName, email.toLowerCase(), hashedPassword]
     );
 
-    // ✅ Return structured result
     return {
       success: true,
       user: new_user.rows[0],
@@ -59,6 +57,55 @@ export default async function userCreation(
     return {
       success: false,
       error: error.message || "Unknown error occurred",
+    };
+  }
+}
+
+// -------------------------
+// SIGNIN FUNCTION
+// -------------------------
+export async function userSignin(email: string, password: string) {
+  try {
+    // Find user by email
+    const result = await db.query("SELECT * FROM users WHERE email=$1", [
+      email.toLowerCase(),
+    ]);
+
+    if (result.rows.length === 0) {
+      throw new Error("User not found");
+    }
+
+    const user = result.rows[0];
+
+    // Compare passwords
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      throw new Error("Invalid credentials");
+    }
+
+    // Generate JWT
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "1h" }
+    );
+
+    // Return success response with token and user info
+    return {
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        fullName: user.fullname,
+        email: user.email,
+        createdAt: user.createdat,
+      },
+    };
+  } catch (err: any) {
+    console.error("Signin error:", err);
+    return {
+      success: false,
+      error: err.message || "Something went wrong",
     };
   }
 }

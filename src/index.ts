@@ -2,7 +2,7 @@ import express, { Request, Response } from "express";
 import dotenv from "dotenv";
 import authRouter from "./routes/auth.routes";
 import db from "./config/database";
-
+import cors from "cors";
 dotenv.config();
 
 // Database connection checking
@@ -17,6 +17,7 @@ const server = express();
 const port = process.env.PORT || 3000;
 
 server.use(express.json());
+server.use(cors());
 
 server.use("/api", authRouter);
 

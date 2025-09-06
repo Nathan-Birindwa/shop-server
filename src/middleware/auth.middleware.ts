@@ -1,6 +1,9 @@
 import { Response, Request } from "express";
-import userCreation from "../services/auth.service";
+import userCreation, { userSignin } from "../services/auth.service";
 
+// --------------------
+// SIGN UP CONTROLLER
+// --------------------
 export default async function create_Account(req: Request, res: Response) {
   try {
     const { fullName, email, password } = req.body;
@@ -30,33 +33,65 @@ export default async function create_Account(req: Request, res: Response) {
       });
     }
 
-    // ✅ Await the async function
+    // ✅ Call service
     const results = await userCreation(fullName, email, password);
 
-    console.log("User creation results:", results);
-
-    // ✅ Handle success/failure from service
     if (results.success) {
-      res.status(201).json({
+      return res.status(201).json({
         message: "Account created successfully",
         data: {
           id: results.user?.id,
           fullName: results.user?.fullName,
           email: results.user?.email,
-          // Don't return password or sensitive data
         },
       });
     } else {
-      // Handle specific error cases
-      const statusCode = results.error?.includes("already exists") ? 409 : 400;
-      res.status(statusCode).json({
+      const statusCode = results.error?.includes("email") ? 409 : 400;
+      return res.status(statusCode).json({
         message: "Failed to create account",
         error: results.error,
       });
     }
   } catch (err: any) {
     console.error("Controller error:", err);
-    res.status(500).json({
+    return res.status(500).json({
+      message: "Internal server error",
+      error: "Something went wrong on our end",
+    });
+  }
+}
+
+// --------------------
+// SIGN IN CONTROLLER
+// --------------------
+export async function sign_in_account(req: Request, res: Response) {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Missing credentials",
+        error: "Email and password are required",
+      });
+    }
+
+    const result = await userSignin(email, password);
+
+    if (result.success) {
+      return res.status(200).json({
+        message: "Signin successful",
+        token: result.token,
+        user: result.user,
+      });
+    } else {
+      return res.status(401).json({
+        message: "Signin failed",
+        error: result.error,
+      });
+    }
+  } catch (err: any) {
+    console.error("Signin controller error:", err);
+    return res.status(500).json({
       message: "Internal server error",
       error: "Something went wrong on our end",
     });
